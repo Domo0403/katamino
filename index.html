@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>百變方塊提示器</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E🧩%3C/text%3E%3C/svg%3E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#6b6b6b;--card:#f1f1f1;--line:#d0d0d0;--acc:#2b6cb0;--accfg:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161616;--fg:#eee;--mut:#9a9a9a;--card:#262626;--line:#444;--acc:#6aa9ee;--accfg:#111}}
+:root[data-theme="dark"]{--bg:#161616;--fg:#eee;--mut:#9a9a9a;--card:#262626;--line:#444;--acc:#6aa9ee;--accfg:#111}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0 auto;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,"Noto Sans TC",sans-serif;padding:14px;max-width:560px}
+h1{font-size:20px;margin:4px 0 12px}
+.lab{font-size:13px;color:var(--mut);margin:12px 0 6px}
+.row{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px;padding:8px 12px;min-width:44px}
+button.on{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;min-width:40px}
+.chip.done{opacity:.35}
+.mini{display:grid;gap:1px}.mini i{width:8px;height:8px;display:block}
+#board{display:grid;gap:2px;margin:14px 0;width:100%}
+#board div{aspect-ratio:1;border-radius:3px;background:var(--card);border:1px solid var(--line)}
+#board div.new{outline:3px solid var(--fg);outline-offset:-3px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}.btns button{flex:1}
+#msg{color:var(--mut);font-size:14px;min-height:20px;margin-top:8px}
+.edit button.chipb{padding:6px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px}
+</style></head><body>
+<h1>百變方塊提示器</h1>
+<div class="lab">卡片區塊</div><div class="row" id="secs"></div>
+<div class="lab">橫排</div><div class="row" id="rows"></div>
+<div class="lab">數字（方塊數／木條位置）</div><div class="row" id="nums"></div>
+<div class="lab">這關的方塊</div><div class="chips" id="chips"></div>
+<div id="board"></div>
+<div class="btns"><button id="hint" class="on">提示一塊</button><button id="all">全部答案</button><button id="reset">重來</button></div>
+<div id="msg"></div>
+<div class="lab" style="margin-top:22px">卡片資料</div>
+<div class="btns"><button id="edtog">編輯這一排</button></div>
+<div id="edit" class="edit" style="display:none">
+<div class="lab">點方塊可換成下一種，依卡片由左到右排列</div>
+<div class="chips" id="echips"></div>
+<div class="btns" style="margin-top:8px"><button id="eadd">＋ 新增一格</button><button id="edel">－ 刪最後一格</button></div>
+</div>
+<script>
+const P={F:[[0,1],[0,2],[1,0],[1,1],[2,1]],I:[[0,0],[1,0],[2,0],[3,0],[4,0]],L:[[0,0],[1,0],[2,0],[3,0],[3,1]],N:[[0,1],[1,1],[2,0],[2,1],[3,0]],P:[[0,0],[0,1],[1,0],[1,1],[2,0]],T:[[0,0],[0,1],[0,2],[1,1],[2,1]],U:[[0,0],[0,2],[1,0],[1,1],[1,2]],V:[[0,0],[1,0],[2,0],[2,1],[2,2]],W:[[0,0],[1,0],[1,1],[2,1],[2,2]],X:[[0,1],[1,0],[1,1],[1,2],[2,1]],Y:[[0,1],[1,0],[1,1],[2,1],[3,1]],Z:[[0,0],[0,1],[1,1],[2,1],[2,2]]};
+const COL={L:"#e8742a",Y:"#6b3a2e",T:"#1f9a6b",P:"#c04fb0",W:"#7bc043",Z:"#17a2d8",V:"#4a90e2",N:"#2b2e9a",U:"#f0d020",F:"#888888",X:"#8a4fc0",I:"#e8a080"};
+const KEYS=Object.keys(P);
+const SEC=[
+{n:"初級",min:3,rows:{A:"LYTPWZVN",B:"NPULZYTW",C:"LVPYNUZF",D:"YPUNVFWT",E:"LNVZUTYW",F:"PUFYTNLW",G:"LVPZYWNF"}},
+{n:"中級①",min:5,rows:{A:"LPUFWYZNV",B:"YNPUZVTLF",C:"LYVTWZFUP",D:"NVPUFWLZT",E:"LYNPWTVFU",F:"LPUZTFNWY",G:"LVPUWNYTZ"}},
+{n:"中級②",min:5,rows:{H:"LNPTWZYFV",I:"LYVUZFWNT",J:"LVPFWYUTN",K:"LYNUWFPVZ",L:"YVPZWNFTU",M:"LYVPFUTZW",N:"LYPZWNUVT"}},
+{n:"中級③",min:6,rows:{O:"LYNUFTZP",P:"LNVPZFTY",Q:"LYPZFWVU",R:"LNVPUTWF",S:"YVPUTWLZ",T:"LYVZFTPW",U:"LNVPUFZT",V:"NVPUZTFY"}},
+{n:"中級④",min:6,rows:{W:"NVPUZFYW",X:"YNVPTWZU",Y:"LNUZFTVY",Z:"LYPFTWUZ","♥":"YNPUZTFW","♦":"LNVUFWYT","♠":"LNVPFTWZ","♣":"LVPUFTNY"}},
+{n:"高級",min:4,rows:{A:"LNVZUTPXFIW",B:"LYUFZVXPINT",C:"LYVPFWNUZTI",D:"YPUFTXLVWZN",E:"LYPZWNTFIUX",F:"LPUFXYINTWV",G:"LYPWNUVZXIF",H:"YNVTFIZWLXU",I:"LVPZYFWINTX",J:"LYPTWNIVUXZ",K:"YNPUVZXIWFT",L:"LYVUZIFTXPW"}},
+{n:"超級",min:5,rows:{A:"LNPTWZVIUYF",B:"LYNVPTWXFIZ",C:"LPUFWIZNVTX",D:"YNPUZLXVTWI",E:"YVPZWNTIXUF",F:"NVPUFXYLITW",G:"LPUTXFNZYVI",H:"LVPFWIUTXZY",I:"LPUZTYIXNFW",J:"LYVTWZFIUXN",K:"LNPUZXIYWFV",L:"LVPUWYXFZNT"}},
+{n:"頂級①",min:7,rows:{"1":"ILYPUWXTVF","2":"LYPZFTWXNU","3":"ILNVUZTYFP","4":"LYPFTWXIZV","5":"IYNVUFWLPX","6":"LVPFTWXZUN","7":"YNPUZFTVXI","8":"ILNPUTXWZY","9":"IVPUZFWNYL","10":"IYNVUTXFWZ"}},
+{n:"頂級②",min:7,rows:{"11":"ILNPZTWFXU","12":"IYNVUZFTWL","13":"LYVUZFWXIN","14":"NVPUFTXYLW","15":"ILYVUFWPZX","16":"LYVPZWXTUI","17":"IYPUZTWNVF","18":"INVPUFXWTZ","19":"LNPZFTWVXY","20":"ILNPZFTXYV"}},
+{n:"頂級③",min:7,rows:{"21":"INVPUZTXLW","22":"ILYUFTWZNX","23":"YNVPZFTWXU","24":"ILYNUTXVZP","25":"IYNVPFWXTZ","26":"LYVUFTXNWI","27":"ILYPUZWXFT","28":"LNVPFTWUIY","29":"ILVPUZXFWN","30":"IYVUZTWPXF"}},
+{n:"頂級④",min:7,rows:{"31":"LYNPFTWXIZ","32":"IYPUZFTNWX","33":"LYNVPZWXFI","34":"ILYUFTXZNV","35":"IYNVUTWPXF","36":"LNVUTWXIFP","37":"ILPUFTWZVY","38":"ILNUZFTVXW","39":"LYNVUFXWZT","40":"ILVPZTWXYN"}}
+];
+let ov={};try{const s=localStorage.getItem("katamino_v2");if(s)ov=JSON.parse(s)}catch(e){}
+const getRow=(s,r)=>(ov[s+"|"+r]||SEC[s].rows[r]).split("");
+function setRow(s,r,a){ov[s+"|"+r]=a.join("");try{localStorage.setItem("katamino_v2",JSON.stringify(ov))}catch(e){}}
+function norm(cs){const mr=Math.min(...cs.map(x=>x[0])),mc=Math.min(...cs.map(x=>x[1]));return cs.map(([r,c])=>[r-mr,c-mc]).sort((a,b)=>a[1]-b[1]||a[0]-b[0])}
+function orients(cs){const seen=new Set(),out=[];let cur=cs;for(let f=0;f<2;f++){for(let k=0;k<4;k++){cur=cur.map(([r,c])=>[c,-r]);const n=norm(cur),key=JSON.stringify(n);if(!seen.has(key)){seen.add(key);out.push(n.map(([r,c])=>[r-n[0][0],c-n[0][1]]))}}cur=cur.map(([r,c])=>[r,-c])}return out}
+const OR={};for(const k of KEYS)OR[k]=orients(P[k]);
+function bad(g,W){const seen=new Uint8Array(g.length);for(let s=0;s<g.length;s++){if(g[s]>=0||seen[s])continue;const st=[s];let cnt=0;seen[s]=1;while(st.length){const x=st.pop();cnt++;const r=(x/W)|0,c=x%W;if(r>0&&g[x-W]<0&&!seen[x-W]){seen[x-W]=1;st.push(x-W)}if(r<4&&g[x+W]<0&&!seen[x+W]){seen[x+W]=1;st.push(x+W)}if(c>0&&g[x-1]<0&&!seen[x-1]){seen[x-1]=1;st.push(x-1)}if(c<W-1&&g[x+1]<0&&!seen[x+1]){seen[x+1]=1;st.push(x+1)}}if(cnt%5)return true}return false}
+function solve(keys,W){const H=5,g=Array(H*W).fill(-1),sol=[],used=Array(keys.length).fill(false);let nodes=0,capped=false;
+function dfs(){if(++nodes>3e6){capped=true;return false}
+let idx=-1;for(let c=0;c<W&&idx<0;c++)for(let r=0;r<H;r++)if(g[r*W+c]<0){idx=r*W+c;break}
+if(idx<0)return true;const r0=(idx/W)|0,c0=idx%W;
+for(let i=0;i<keys.length;i++){if(used[i])continue;
+for(const o of OR[keys[i]]){const cs=[];let ok=true;
+for(const[dr,dc]of o){const r=r0+dr,c=c0+dc;if(r<0||r>=H||c<0||c>=W||g[r*W+c]>=0){ok=false;break}cs.push(r*W+c)}
+if(!ok)continue;cs.forEach(x=>g[x]=i);used[i]=true;sol.push({i,cs});
+if(!bad(g,W)&&dfs())return true;if(capped)return false;
+sol.pop();used[i]=false;cs.forEach(x=>g[x]=-1)}}
+return false}
+const f=dfs();return{sol:f?sol:null,capped}}
+let si=0,row="A",n=3,sol=null,capped=false,shown=0,editing=false;
+const $=id=>document.getElementById(id);
+function mini(k){const cs=P[k],R=Math.max(...cs.map(x=>x[0]))+1,C=Math.max(...cs.map(x=>x[1]))+1;let h='<div class="mini" style="grid-template-columns:repeat('+C+',8px)">';
+for(let r=0;r<R;r++)for(let c=0;c<C;c++){const on=cs.some(x=>x[0]===r&&x[1]===c);h+='<i style="background:'+(on?COL[k]:"transparent")+'"></i>'}return h+"</div>"}
+function keysNow(){return getRow(si,row).slice(0,n)}
+function recompute(){const res=solve(keysNow(),n);sol=res.sol;capped=res.capped;shown=0;render()}
+function render(){
+$("secs").innerHTML=SEC.map((s,i)=>'<button data-s="'+i+'" class="'+(i===si?"on":"")+'">'+s.n+"</button>").join("");
+$("rows").innerHTML=Object.keys(SEC[si].rows).map(r=>'<button data-r="'+r+'" class="'+(r===row?"on":"")+'">'+r+"</button>").join("");
+const len=getRow(si,row).length,min=SEC[si].min;if(n>len)n=len;if(n<min)n=min;
+let nb="";for(let i=min;i<=len;i++)nb+='<button data-n="'+i+'" class="'+(i===n?"on":"")+'">'+i+"</button>";$("nums").innerHTML=nb;
+const ks=keysNow();
+$("chips").innerHTML=ks.map((k,i)=>'<div class="chip'+(sol&&sol.slice(0,shown).some(s=>s.i===i)?" done":"")+'">'+mini(k)+k+"</div>").join("");
+const W=n,cells=Array(5*W).fill(-1);
+if(sol)sol.slice(0,shown).forEach((s,j)=>s.cs.forEach(x=>cells[x]=j));
+const b=$("board");b.style.gridTemplateColumns="repeat("+W+",1fr)";
+b.innerHTML=cells.map(v=>{if(v<0)return"<div></div>";const s=sol[v];return'<div class="'+(v===shown-1?"new":"")+'" style="background:'+COL[ks[s.i]]+'"></div>'}).join("");
+const dup=new Set(ks).size<ks.length;
+$("msg").textContent=sol?(shown===0?"木條放在 "+n+"，共 "+n+" 塊。按「提示一塊」。":shown<sol.length?"已提示 "+shown+" / "+sol.length+" 塊（黑框是剛提示的那塊）":"全部擺好了"):(capped?"算太久了，這排資料可能有讀錯，請核對卡片。":dup?"這排有重複的方塊，應該是讀錯了，請按「編輯這一排」修正。":"找不到解，這排資料可能有讀錯，請按「編輯這一排」核對。");
+if(editing)renderEdit()}
+function renderEdit(){$("echips").innerHTML=getRow(si,row).map((k,i)=>'<button class="chipb" data-e="'+i+'">'+mini(k)+k+"</button>").join("")}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
+if(t.dataset.s!==undefined){si=+t.dataset.s;row=Object.keys(SEC[si].rows)[0];n=SEC[si].min;recompute()}
+else if(t.dataset.r){row=t.dataset.r;recompute()}
+else if(t.dataset.n){n=+t.dataset.n;recompute()}
+else if(t.dataset.e!==undefined){const i=+t.dataset.e,a=getRow(si,row);a[i]=KEYS[(KEYS.indexOf(a[i])+1)%KEYS.length];setRow(si,row,a);recompute()}});
+$("hint").onclick=()=>{if(sol&&shown<sol.length){shown++;render()}};
+$("all").onclick=()=>{if(sol){shown=sol.length;render()}};
+$("reset").onclick=()=>{shown=0;render()};
+$("edtog").onclick=()=>{editing=!editing;$("edit").style.display=editing?"block":"none";$("edtog").classList.toggle("on",editing);if(editing)renderEdit()};
+$("eadd").onclick=()=>{const a=getRow(si,row);a.push("L");setRow(si,row,a);recompute()};
+$("edel").onclick=()=>{const a=getRow(si,row);if(a.length>SEC[si].min){a.pop();setRow(si,row,a);recompute()}};
+recompute();
+</script></body></html>
